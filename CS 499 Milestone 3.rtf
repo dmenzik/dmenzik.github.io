@@ -1,0 +1,102 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2577
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww15840\viewh14140\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 \
+import json\
+from bson import json_util\
+import bottle\
+from bottle import route, run, request, abort, post, get\
+from pymongo import MongoClient\
+\
+\
+# Sets db to city and collection to inspections\
+\
+connection = MongoClient('localhost', 27017)\
+db = connection['market']\
+collection = db['stocks']\
+\
+# Creates new document in inspections collection\
+\
+@post('/create')\
+def createStock():\
+  try:\
+    #Create a stock record\
+    collection.insert_one(request.json)\
+    result = "Record created\\n"\
+  except:\
+    result = "404 Error creating record\\n"\
+  return json.loads(json.dumps(result, indent = 4, default = json_util.default))\
+\
+\
+# Searches for and prints desired document \
+\
+@route('/read', method = 'GET')\
+def displayStock():\
+  #Search for desired stock\
+  try:\
+    result = str(collection.find_one(request.query))\
+  except:\
+    result = "404 Failed to find stock"\
+    \
+  return json.loads(json.dumps(result + "\\n", indent = 4, default = json_util.default))\
+\
+  \
+# Updates the document and then prints the finished product\
+\
+@route('/update', method = 'GET')\
+def updateStock():\
+  result = "Record updated"\
+  try:\
+    items = request.query.items()\
+    if(len(items) == 2):\
+      collection.update_one(\{items[1][0]:items[1][1]\}, \{"$set" : \{items[0][0] : items[0][1]\}\})\
+      \
+  except:\
+    result = "404 Failed to update stock"\
+      \
+  return json.loads(json.dumps(result + "\\n", indent = 4, default = json_util.default))\
+  \
+    \
+# Performs search for given document and if found, document is printed and then deleted \
+\
+@route('/delete', method = 'GET')\
+def deleteStock():\
+  result = "Stock deleted"\
+  try:\
+    collection.delete_one(request.query)\
+  except:\
+    result = "404 Failed to delete stock"\
+    \
+  return json.loads(json.dumps(result + "\\n", indent = 4, default = json_util.default))\
+\
+    \
+\
+    \
+#Path to give a report on the top five stocks in a given industry\
+@route('/industryReport', method = 'GET')\
+def industry_report():\
+  try:\
+    pipeline = [\{"$match" : request.query\}, \{"$sort" : \{"Performance (YTD)" : -1\}\}, \{"$limit" : 5\}]\
+    sort_col = list(collection.aggregate(pipeline))\
+    #Put top 5 stocks into dictionary\
+    ret_dict = \{\}\
+    cntr = 1\
+    for i in sort_col:\
+      ret_dict[cntr] = i\
+      cntr = cntr + 1\
+    #Return dictionary\
+    return json.loads(json.dumps(ret_dict, indent = 4, default = json_util.default))\
+  except:\
+    return json.loads(json.dumps("ERROR: Unable to complete query task\\n", indent = 4, defaunt = json_util.default))\
+  \
+    \
+    \
+\
+# Entry point to start REST\
+\
+if __name__ == '__main__':\
+  run(host='localhost', port=8080, debug=True)}
